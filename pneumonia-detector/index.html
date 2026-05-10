@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PneumoScan AI — Chest X-Ray Pneumonia Detector</title>
+    <meta name="description" content="AI-powered pneumonia detection from chest X-ray images using deep learning. Upload an X-ray and get instant analysis.">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js" defer></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Animated Background -->
+    <div class="bg-animation">
+        <div class="pulse-ring ring-1"></div>
+        <div class="pulse-ring ring-2"></div>
+        <div class="pulse-ring ring-3"></div>
+    </div>
+
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header" id="app-header">
+            <div class="logo">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="20" cy="20" r="18" stroke="url(#grad)" stroke-width="2.5" fill="none"/>
+                        <path d="M20 8 L20 32 M8 20 L32 20" stroke="url(#grad)" stroke-width="2.5" stroke-linecap="round"/>
+                        <defs>
+                            <linearGradient id="grad" x1="0" y1="0" x2="40" y2="40">
+                                <stop offset="0%" stop-color="#00d4ff"/>
+                                <stop offset="100%" stop-color="#7c3aed"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                </div>
+                <div>
+                    <h1>PneumoScan<span class="ai-badge">AI</span></h1>
+                    <p class="tagline">Chest X-Ray Analysis Engine</p>
+                </div>
+            </div>
+            <div class="header-status">
+                <div class="status-dot" id="model-status-dot"></div>
+                <span id="model-status-text">Loading Model...</span>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Upload Section -->
+            <section class="upload-section" id="upload-section">
+                <label class="upload-zone" id="upload-zone" for="file-input">
+                    <div class="upload-icon">
+                        <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect x="10" y="15" width="60" height="50" rx="6" stroke="currentColor" stroke-width="2" fill="none"/>
+                            <circle cx="40" cy="38" r="12" stroke="currentColor" stroke-width="2" fill="none"/>
+                            <circle cx="40" cy="38" r="5" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                            <line x1="28" y1="38" x2="52" y2="38" stroke="currentColor" stroke-width="0.8" opacity="0.5"/>
+                            <line x1="40" y1="26" x2="40" y2="50" stroke="currentColor" stroke-width="0.8" opacity="0.5"/>
+                            <path d="M55 20 L60 15 L65 20" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+                            <line x1="60" y1="15" x2="60" y2="8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                        </svg>
+                    </div>
+                    <h2>Upload Chest X-Ray</h2>
+                    <p>Drag & drop an image here, or click to browse</p>
+                    <p class="upload-hint">Supports JPG, PNG • Frontal PA/AP view recommended</p>
+                    <input type="file" id="file-input" accept="image/*" hidden>
+                </label>
+
+                <!-- Demo Mode Banner -->
+                <div class="demo-banner" id="demo-banner">
+                    <div class="demo-icon">⚡</div>
+                    <div>
+                        <strong>Demo Mode Active</strong>
+                        <p>No trained model found. Using simulated analysis to demonstrate the interface. Train your model in Google Colab to get real predictions!</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Analysis Section (hidden until image uploaded) -->
+            <section class="analysis-section hidden" id="analysis-section">
+                <div class="analysis-grid">
+                    <!-- X-Ray Preview -->
+                    <div class="xray-panel">
+                        <div class="panel-header">
+                            <h3>X-Ray Image</h3>
+                            <button class="btn-icon" id="btn-new-scan" title="New Scan">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                                    <path d="M23 4v6h-6M1 20v-6h6"/>
+                                    <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="xray-display">
+                            <img id="xray-preview" alt="Uploaded X-Ray">
+                            <div class="scan-overlay" id="scan-overlay">
+                                <div class="scan-line"></div>
+                            </div>
+                        </div>
+                        <div class="image-info" id="image-info">
+                            <span id="img-name">—</span>
+                            <span id="img-size">—</span>
+                        </div>
+                    </div>
+
+                    <!-- Results Panel -->
+                    <div class="results-panel">
+                        <div class="panel-header">
+                            <h3>Analysis Results</h3>
+                            <div class="analysis-time" id="analysis-time">—</div>
+                        </div>
+
+                        <!-- Loading State -->
+                        <div class="analyzing-state" id="analyzing-state">
+                            <div class="analyzing-spinner"></div>
+                            <p>Analyzing X-Ray...</p>
+                            <p class="analyzing-sub">Running neural network inference</p>
+                        </div>
+
+                        <!-- Results Content -->
+                        <div class="results-content hidden" id="results-content">
+                            <!-- Primary Diagnosis -->
+                            <div class="diagnosis-card" id="diagnosis-card">
+                                <div class="diagnosis-icon" id="diagnosis-icon">—</div>
+                                <div>
+                                    <div class="diagnosis-label">Primary Finding</div>
+                                    <div class="diagnosis-value" id="diagnosis-value">—</div>
+                                </div>
+                                <div class="confidence-badge" id="confidence-badge">—</div>
+                            </div>
+
+                            <!-- Probability Bars -->
+                            <div class="probabilities">
+                                <h4>Class Probabilities</h4>
+                                <div class="prob-item">
+                                    <div class="prob-label">
+                                        <span class="prob-dot normal"></span>
+                                        <span>Normal</span>
+                                    </div>
+                                    <div class="prob-bar-wrap">
+                                        <div class="prob-bar normal" id="prob-normal" style="width: 0%"></div>
+                                    </div>
+                                    <span class="prob-value" id="prob-normal-val">0%</span>
+                                </div>
+                                <div class="prob-item">
+                                    <div class="prob-label">
+                                        <span class="prob-dot bacterial"></span>
+                                        <span>Bacterial Pneumonia</span>
+                                    </div>
+                                    <div class="prob-bar-wrap">
+                                        <div class="prob-bar bacterial" id="prob-bacterial" style="width: 0%"></div>
+                                    </div>
+                                    <span class="prob-value" id="prob-bacterial-val">0%</span>
+                                </div>
+                                <div class="prob-item">
+                                    <div class="prob-label">
+                                        <span class="prob-dot viral"></span>
+                                        <span>Viral Pneumonia</span>
+                                    </div>
+                                    <div class="prob-bar-wrap">
+                                        <div class="prob-bar viral" id="prob-viral" style="width: 0%"></div>
+                                    </div>
+                                    <span class="prob-value" id="prob-viral-val">0%</span>
+                                </div>
+                            </div>
+
+                            <!-- Disclaimer -->
+                            <div class="disclaimer">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <line x1="12" y1="8" x2="12" y2="12"/>
+                                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                                </svg>
+                                <span>For educational/demo purposes only. Not a substitute for professional medical diagnosis.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- How It Works -->
+            <section class="how-it-works" id="how-section">
+                <h2>How It Works</h2>
+                <div class="steps-grid">
+                    <div class="step-card">
+                        <div class="step-number">01</div>
+                        <div class="step-icon">📤</div>
+                        <h3>Upload X-Ray</h3>
+                        <p>Upload a frontal chest X-ray image (PA or AP view) in JPG or PNG format.</p>
+                    </div>
+                    <div class="step-card">
+                        <div class="step-number">02</div>
+                        <div class="step-icon">🧠</div>
+                        <h3>AI Analysis</h3>
+                        <p>Our CNN model (MobileNetV2) processes the image through multiple neural network layers.</p>
+                    </div>
+                    <div class="step-card">
+                        <div class="step-number">03</div>
+                        <div class="step-icon">📊</div>
+                        <h3>Get Results</h3>
+                        <p>Receive instant classification: Normal, Bacterial Pneumonia, or Viral Pneumonia with confidence scores.</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>PneumoScan AI — Built with TensorFlow.js • For Educational Use Only</p>
+        </footer>
+    </div>
+
+    <!-- Error Modal -->
+    <div class="modal-overlay hidden" id="error-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div class="warning-icon">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                        <line x1="12" y1="9" x2="12" y2="13"/>
+                        <line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                </div>
+                <h2>Invalid Image Detected</h2>
+            </div>
+            <div class="modal-body">
+                <p>The uploaded image does not appear to be a chest X-ray. It contains high color saturation which is atypical for medical X-ray scans.</p>
+                <p class="modal-sub">Please upload a grayscale frontal chest X-ray for accurate analysis.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-primary" id="btn-modal-cancel">Try Another Image</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js" defer></script>
+</body>
+</html>
